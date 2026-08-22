@@ -4,7 +4,22 @@
   "main": "server.js",
   "author": "Gabriel Orofino",
   "license": "Apache-2.0",
+  "scripts": {
+    "start": "node server.js",
+    "test": "nyc mocha --recursive"
+  },
   "dependencies": {
-    "fabric-network": "^2.2.16"
+    "fabric-ca-client": "^2.2.20",
+    "fabric-contract-api": "^2.5.8",
+    "fabric-network": "^2.2.20",
+    "json-stringify-deterministic": "^1.0.16",
+    "sort-keys-recursive": "^2.1.10"
+  },
+  "devDependencies": {
+    "chai": "^4.5.0",
+    "chai-as-promised": "^7.1.2",
+    "mocha": "^11.8.0",
+    "nyc": "^18.0.0",
+    "sinon": "^22.1.0"
   }
 }

@@ -21,6 +21,19 @@ async InitLedger(ctx) {
     }
 }
 
+async AssetExists(ctx, id) {
+    const assetJSON = await ctx.stub.getState(id);
+    return assetJSON && assetJSON.length > 0;
+}
+
+async ReadAsset(ctx, id) {
+    const assetJSON = await ctx.stub.getState(id);
+    if (!assetJSON || assetJSON.length === 0) {
+        throw new Error(`The asset ${id} does not exist`);
+    }
+    return assetJSON.toString();
+}
+
 async CreateAsset(ctx, id, owner, appraisedValue) {
     const exists = await this.AssetExists(ctx, id);
     if (exists) {
@@ -31,15 +44,19 @@ async CreateAsset(ctx, id, owner, appraisedValue) {
     return JSON.stringify(asset);
 }
 
-async TransferAsset(ctx, id, newOwner, value) {        
+async TransferAsset(ctx, id, newOwner, value) {
     const assetString = await this.ReadAsset(ctx, id);
     const asset = JSON.parse(assetString);
     if (asset.AppraisedValue < value) {
         throw new Error(`The value to transfer exceeds that of asset ${id}`);
-    }        
-    await this.CreateAsset(ctx, 'e0162780-2afc-46c8-8662-54a156c456da', asset.Owner, -value)
-    await this.CreateAsset(ctx, '43b6d8d5-a347-4521-b1e0-11e6ae8c040a', newOwner, value)
-    return oldOwner;
+    }
+    const oldOwner = asset.Owner;
+    const txId = ctx.stub.getTxID();
+    const debitId = `${txId}-debit`;
+    const creditId = `${txId}-credit`;
+    await this.CreateAsset(ctx, debitId, oldOwner, -value)
+    await this.CreateAsset(ctx, creditId, newOwner, value)
+    return JSON.stringify({ from: oldOwner, to: newOwner, value, debitId, creditId });
 }
 
 async GetAllAssets(ctx) {

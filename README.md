@@ -7,6 +7,11 @@ Decentralized Infrastructure by the Central Bank"), by Gabriel
 Orofino, Centro Universitário Ibmec/RJ, 2022 (advisor: Prof. Me. Victor
 Machado da Silva).
 
+The code exactly as submitted for the thesis is preserved at the
+[`v1.0.0` release](https://github.com/oniforo/central-bank-settlement-chain/releases/tag/v1.0.0).
+This document and the code have since been updated beyond that snapshot -
+see **Known gaps** for what's changed and why.
+
 ## Context
 
 Brazil's Reserve Transfer System (**STR** - *Sistema de Transferência de
@@ -28,23 +33,35 @@ Implementação").
 ## What's in this repo
 
 - [functions.js](functions.js) - the `AssetTransfer` chaincode contract
-  (Fabric Contract API), reproduced verbatim from the thesis's Figure 14
-  ("Código Javascript modificado"):
+  (Fabric Contract API), based on the thesis's Figure 14 ("Código Javascript
+  modificado"), with the bugs described in the thesis fixed (see
+  **Known gaps**):
   - `InitLedger` - seeds the ledger with six sample assets/balances
+  - `AssetExists(id)` / `ReadAsset(id)` - existence check and read, used by
+    the two methods below
   - `CreateAsset(id, owner, appraisedValue)` - creates a new ledger entry
   - `TransferAsset(id, newOwner, value)` - represents a transfer as a debit
     entry and a credit entry (see **Simplifying hypothesis** below)
   - `GetAllAssets` - returns every entry currently on the ledger
+- [server.js](server.js) - a `fabric-network`/`fabric-ca-client` CLI client
+  that enrolls an application identity, connects to the `canal-str` channel,
+  and runs a demo sequence against the `basico` chaincode (`InitLedger`,
+  `GetAllAssets`, a `TransferAsset` call, `GetAllAssets` again)
 - [entrypoint.sh](entrypoint.sh) - the exact command sequence from section
   3.6: installs Hyperledger Fabric, brings up the `test-network` sample,
-  creates the `canal-str` channel, deploys `functions.js` as the `basico`
-  chaincode, and invokes/queries a transfer between two of the seeded
-  accounts (Adriana → Michel)
+  creates the `canal-str` channel, deploys chaincode, and invokes/queries a
+  transfer between two of the seeded accounts (Adriana → Michel)
 - [Dockerfile](Dockerfile) / [docker-compose.yml](docker-compose.yml) -
-  unfinished scaffolding, not part of the thesis's documented flow (see
-  **Known gaps**)
-- [package.json](package.json) / [yarn.lock](yarn.lock) - Node manifest
-  declaring the `fabric-network` SDK dependency
+  containerizes `server.js` and attaches it to the Fabric test-network's
+  Docker network so it can reach the running peers (see **Running the
+  client app**)
+- [package.json](package.json) / [yarn.lock](yarn.lock) - Node manifest for
+  both the chaincode's own runtime dependencies (`fabric-contract-api`,
+  `json-stringify-deterministic`, `sort-keys-recursive`) and the client's
+  (`fabric-network`, `fabric-ca-client`)
+- [test/functions.test.js](test/functions.test.js) - Mocha/Chai/Sinon unit
+  tests for `functions.js`, run automatically on every push/PR (see
+  [.github/workflows/test.yml](.github/workflows/test.yml))
 
 ## Running the PoC
 
@@ -57,10 +74,56 @@ yarn install
 
 Then follow [entrypoint.sh](entrypoint.sh) - it installs Fabric's samples,
 binaries and Docker images, stands up `test-network`, creates the
-`canal-str` channel, deploys `functions.js` as chaincode `basico`, and runs
-`InitLedger`, `GetAllAssets`, and a `TransferAsset` invocation. It is a
-reference/runbook script (as in the thesis), not meant to be executed
-unattended.
+`canal-str` channel, deploys chaincode `basico`, and runs `InitLedger`,
+`GetAllAssets`, and a `TransferAsset` invocation via the native `peer`
+CLI. It is a reference/runbook script (as in the thesis), not meant to be
+executed unattended.
+
+## Running the client app
+
+Once the test network is up and chaincode `basico` is deployed (i.e. after
+running through `entrypoint.sh`), the same demo sequence can be run through
+the `fabric-network` SDK instead of the native `peer` CLI:
+
+**Bare host:**
+
+```bash
+yarn install
+yarn start
+```
+
+`server.js` looks for the test-network's connection profile under
+`TEST_NETWORK_HOME` (defaults to `~/src/fabric/fabric-samples/test-network`,
+the same path `entrypoint.sh` uses) and enrolls an application identity into
+a local filesystem wallet (`wallet/`, gitignored) on first run.
+
+**Containerized:**
+
+```bash
+export TEST_NETWORK_HOME=~/src/fabric/fabric-samples/test-network
+docker compose up --build
+```
+
+This attaches the client container to the `fabric_test` Docker network that
+Fabric's `test-network` already creates, mounting the host's generated
+crypto material read-only and reaching peers by their container DNS names
+instead of `localhost`.
+
+## Running tests
+
+The chaincode logic (`functions.js`) has a unit test suite that mocks
+`ctx.stub` in-memory, so it runs standalone without a live Fabric network:
+
+```bash
+yarn install
+yarn test
+```
+
+This runs Mocha under `nyc` for coverage reporting. `server.js` isn't
+covered by these tests - it's a thin SDK wrapper whose behavior only means
+anything against a live network, so it's exercised via **Running the client
+app** instead. The same `yarn test` command runs on every push/PR via
+[GitHub Actions](.github/workflows/test.yml).
 
 ## Simplifying hypothesis (from the thesis)
 
@@ -73,32 +136,53 @@ existing balance in place.
 
 ## Known gaps
 
-These are gaps between the thesis's described/intended behavior and what
-the checked-in code actually does - kept as-is (not patched) so the repo
-matches the thesis submission ipsis literis:
+The following described the thesis submission's code ipsis literis; they've
+since been fixed and are kept here as a record of what was actually wrong
+(the original analysis undersold it - see the first bullet):
 
-- **`TransferAsset` returns an undefined variable.** `return oldOwner;`
-  references a variable that's never declared in the function, so the call
-  throws a `ReferenceError` - after the two `CreateAsset` writes have
-  already been applied to the ledger. Running the `TransferAsset` step in
-  `entrypoint.sh` will report an invocation error even though the
-  underlying state change succeeds.
-- **The two debit/credit entry IDs are hardcoded** (`'e0162780-2afc-46c8'`,
-  `'43b6d8d5-a347-4521'`) instead of generated per transaction. Since
-  `CreateAsset` rejects an ID that already exists, a second `TransferAsset`
-  call will fail with "asset already exists."
-- **`package.json` declares `"main": "server.js"`** and depends on the
-  `fabric-network` SDK, but no `server.js` exists. The thesis explicitly
-  chose native `peer chaincode` CLI commands over an SDK-based client for
-  this demonstration ("serão utilizados os comandos nativos"), so this
-  dependency/entry point looks like unfinished groundwork for an SDK-driven
-  client that was never built.
-- **`Dockerfile` and `docker-compose.yml` are empty/near-empty** and are
-  not part of the setup path in `entrypoint.sh`. The thesis's flow
-  provisions containers via `install-fabric.sh` pulling `fabric-samples`,
-  whose own `test-network` docker-compose files do the real container
-  orchestration - these top-level files were an unfinished attempt at
-  something else (likely containerizing the setup script itself).
+- ~~`TransferAsset` returns an undefined variable~~ **and, more seriously,
+  called two methods that didn't exist.** `CreateAsset` called
+  `this.AssetExists(...)` and `TransferAsset` called `this.ReadAsset(...)`,
+  but neither method was defined anywhere in the class - so both threw a
+  `TypeError` immediately, before any ledger write happened (only
+  `InitLedger`/`GetAllAssets` worked, since they're the only two methods
+  that didn't depend on the missing helpers). Fixed by adding the standard
+  `AssetExists`/`ReadAsset` implementations and correcting `TransferAsset`'s
+  return value.
+- ~~The two debit/credit entry IDs are hardcoded~~, which meant a second
+  `TransferAsset` call would fail with "asset already exists." Fixed by
+  deriving both IDs from `ctx.stub.getTxID()` - the transaction ID, which is
+  the standard source of a value every endorsing peer computes identically
+  (chaincode must stay deterministic; `Date.now()`/`Math.random()`/
+  `crypto.randomUUID()` would diverge across peers and fail endorsement).
+- ~~`package.json` declared `"main": "server.js"` with no such file~~ -
+  `server.js` now exists (see **What's in this repo**).
+- ~~`Dockerfile`/`docker-compose.yml` were empty~~ - now containerize the
+  client app (see **Running the client app**).
+
+**Still an open gap**: `entrypoint.sh` deploys chaincode from
+`../asset-transfer-basic/chaincode-javascript` - a path inside
+`fabric-samples`, not from this repo. So this repo's `functions.js` has
+never actually been the file `entrypoint.sh` deploys; it's illustrative
+(matching the thesis's Figure 14) rather than the deployed source. Its
+runtime dependencies (`fabric-contract-api`,
+`json-stringify-deterministic`, `sort-keys-recursive`) are now declared in
+`package.json` so it's at least loadable/testable standalone, but wiring
+`entrypoint.sh` to actually deploy this repo's version is a separate,
+larger change not made here.
+
+**Known, accepted security risk**: `jsrsasign` (used by `fabric-common` for
+certificate/crypto handling) has several open CVEs, including one critical.
+`fabric-common` pins `"jsrsasign": "^10.5.25"` - and that's true even at the
+latest stable `fabric-common` release (`2.2.20`; nothing newer exists except
+unstable `2.5.0-snapshot.*` pre-releases) - which caps resolution below the
+`>=11.0.0` the fixes need. This can't be closed by any `package.json`
+version bump on this repo's side; it's an upstream Hyperledger Fabric SDK
+limitation. A `yarn` `resolutions` override could force a newer `jsrsasign`,
+but that would be a semver-major jump underneath a crypto/signing library
+that `fabric-common` doesn't declare as compatible - risking silent
+breakage in identity enrollment/signing that would only surface at runtime.
+Left as-is and tracked rather than forced.
 
 ## Future work (from the thesis's closing remarks)
 

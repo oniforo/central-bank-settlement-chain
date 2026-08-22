@@ -1,2 +1,5 @@
 node_modules
 .env
+wallet
+.nyc_output
+coverage
