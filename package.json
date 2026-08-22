@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "author": "Gabriel Orofino",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "fabric-network": "^2.2.16"
   }
