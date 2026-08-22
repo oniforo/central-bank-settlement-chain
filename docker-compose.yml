@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: fabric-client-app
+    networks:
+      - fabric_test
+    volumes:
+      - ${TEST_NETWORK_HOME}/organizations:/network/organizations:ro
+    environment:
+      - TEST_NETWORK_HOME=/network
+      - AS_LOCALHOST=false
+
+networks:
+  fabric_test:
+    external: true
