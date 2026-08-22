@@ -4,7 +4,14 @@
   "main": "server.js",
   "author": "Gabriel Orofino",
   "license": "Apache-2.0",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "fabric-network": "^2.2.16"
+    "fabric-ca-client": "^2.2.20",
+    "fabric-contract-api": "^2.5.8",
+    "fabric-network": "^2.2.20",
+    "json-stringify-deterministic": "^1.0.16",
+    "sort-keys-recursive": "^2.1.10"
   }
 }
