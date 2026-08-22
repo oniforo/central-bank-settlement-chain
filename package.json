@@ -1,5 +1,5 @@
 {
-  "name": "hyperledger-fabric",
+  "name": "central-bank-settlement-chain",
   "version": "1.0.0",
   "main": "server.js",
   "author": "Gabriel Orofino",
