@@ -7,7 +7,7 @@ const sinon = require('sinon');
 chai.use(chaiAsPromised);
 const { expect } = chai;
 
-const AssetTransfer = require('../functions.js');
+const AssetTransfer = require('../chaincode/functions.js');
 
 /**
  * Minimal in-memory stand-in for ctx.stub, covering just what functions.js

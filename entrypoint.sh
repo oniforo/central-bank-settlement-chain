@@ -1,5 +1,10 @@
+#!/bin/bash
 # Documentation reference
 # https://hyperledger-fabric.readthedocs.io/en/latest/
+
+# Absolute path to this repo (entrypoint.sh's own directory), so the
+# chaincode package below can be referenced regardless of cwd.
+REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 apt update
 apt upgrade -y
@@ -23,7 +28,7 @@ cd fabric-samples/test-network
 # Create channel
 
 ./network.sh createChannel -c canal-str
-./network.sh deployCC -c canal-str -ccn basico -ccp ../asset-transfer-basic/chaincode-javascript -ccl javascript
+./network.sh deployCC -c canal-str -ccn basico -ccp "$REPO_HOME/chaincode" -ccl javascript
 
 # Environment variables
 
@@ -45,7 +50,7 @@ peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.exa
 peer chaincode query -C canal-str -n basico -c '{"Args":["GetAllAssets"]}'
 
 # Transfer asset
-peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C canal-str -n basico --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{"function":"TransferAsset","Args":["asset6","Christopher",]}'
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C canal-str -n basico --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{"function":"TransferAsset","Args":["asset5","Michel","100"]}'
 
 # Query assets one more time
 peer chaincode query -C canal-str -n basico -c '{"Args":["GetAllAssets"]}'
