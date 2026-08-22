@@ -1,5 +1,9 @@
 # Fund Transfer System - Decentralized Infrastructure PoC
 
+[![Build Status](https://img.shields.io/github/actions/workflow/status/oniforo/central-bank-settlement-chain/test.yml?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/actions/workflows/test.yml)
+[![Latest Release](https://img.shields.io/github/v/release/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/releases/latest)
+[![License](https://img.shields.io/github/license/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/blob/main/LICENSE)
+
 This repository holds the proof-of-concept code from the bachelor's thesis
 **"Sistema de Transferência de Fundos: Adoção de uma Infraestrutura
 Descentralizada pelo Banco Central"** ("Fund Transfer System: Adoption of a
