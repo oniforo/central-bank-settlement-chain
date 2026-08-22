@@ -59,6 +59,9 @@ Implementação").
   both the chaincode's own runtime dependencies (`fabric-contract-api`,
   `json-stringify-deterministic`, `sort-keys-recursive`) and the client's
   (`fabric-network`, `fabric-ca-client`)
+- [test/functions.test.js](test/functions.test.js) - Mocha/Chai/Sinon unit
+  tests for `functions.js`, run automatically on every push/PR (see
+  [.github/workflows/test.yml](.github/workflows/test.yml))
 
 ## Running the PoC
 
@@ -105,6 +108,22 @@ This attaches the client container to the `fabric_test` Docker network that
 Fabric's `test-network` already creates, mounting the host's generated
 crypto material read-only and reaching peers by their container DNS names
 instead of `localhost`.
+
+## Running tests
+
+The chaincode logic (`functions.js`) has a unit test suite that mocks
+`ctx.stub` in-memory, so it runs standalone without a live Fabric network:
+
+```bash
+yarn install
+yarn test
+```
+
+This runs Mocha under `nyc` for coverage reporting. `server.js` isn't
+covered by these tests - it's a thin SDK wrapper whose behavior only means
+anything against a live network, so it's exercised via **Running the client
+app** instead. The same `yarn test` command runs on every push/PR via
+[GitHub Actions](.github/workflows/test.yml).
 
 ## Simplifying hypothesis (from the thesis)
 
