@@ -171,6 +171,19 @@ runtime dependencies (`fabric-contract-api`,
 `entrypoint.sh` to actually deploy this repo's version is a separate,
 larger change not made here.
 
+**Known, accepted security risk**: `jsrsasign` (used by `fabric-common` for
+certificate/crypto handling) has several open CVEs, including one critical.
+`fabric-common` pins `"jsrsasign": "^10.5.25"` - and that's true even at the
+latest stable `fabric-common` release (`2.2.20`; nothing newer exists except
+unstable `2.5.0-snapshot.*` pre-releases) - which caps resolution below the
+`>=11.0.0` the fixes need. This can't be closed by any `package.json`
+version bump on this repo's side; it's an upstream Hyperledger Fabric SDK
+limitation. A `yarn` `resolutions` override could force a newer `jsrsasign`,
+but that would be a semver-major jump underneath a crypto/signing library
+that `fabric-common` doesn't declare as compatible - risking silent
+breakage in identity enrollment/signing that would only surface at runtime.
+Left as-is and tracked rather than forced.
+
 ## Future work (from the thesis's closing remarks)
 
 The thesis's "Considerações Finais" suggests these extensions:
