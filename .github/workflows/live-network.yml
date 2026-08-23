@@ -71,7 +71,10 @@ jobs:
             --peerAddresses localhost:9051 --tlsRootCertFiles "$ORG2_TLS" \
             -c '{"function":"TransferAsset","Args":["asset5","Michel","100"]}' 2>&1)
           echo "$transfer_output"
-          echo "$transfer_output" | grep -q '"from":"Adriana","to":"Michel","value":"100"' \
+          # peer chaincode invoke logs the payload as an escaped string inside
+          # its own structured log line (\"from\":\"Adriana\"...), unlike the
+          # SDK client which prints clean unescaped JSON - match that form here.
+          echo "$transfer_output" | grep -q '\\"from\\":\\"Adriana\\",\\"to\\":\\"Michel\\",\\"value\\":\\"100\\"' \
             || { echo "FAIL: TransferAsset response did not match the expected shape"; exit 1; }
           sleep 3
 
