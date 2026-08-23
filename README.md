@@ -5,6 +5,10 @@
 [![Latest Release](https://img.shields.io/github/v/release/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/releases/latest)
 [![License](https://img.shields.io/github/license/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/blob/main/LICENSE)
 
+A two-organization Hyperledger Fabric channel modeling a Central Bank fund
+transfer, deployed to a live network and run end-to-end - continuously
+re-verified by CI on every change.
+
 > **Sistema de Transferência de Fundos: Adoção de uma Infraestrutura
 > Descentralizada pelo Banco Central** ("Fund Transfer System: Adoption of a
 > Decentralized Infrastructure by the Central Bank") - bachelor's thesis by
@@ -18,9 +22,24 @@ described in section 3.6 has been deployed to a live Hyperledger Fabric
 network and run end to end - `InitLedger` seeding the ledger, `TransferAsset`
 moving value between two economic agents, `GetAllAssets` reflecting the
 result - through all three ways this repo can be used (the native `peer`
-CLI, the `fabric-network` SDK client, and the containerized client). See
-**Known gaps** for the handful of real bugs that verification caught and
-fixed along the way.
+CLI, the `fabric-network` SDK client, and the containerized client). This
+validates the two-organization model the thesis proposes, not production
+RTGS scale or throughput - see **Simplifying hypothesis** and **Future
+work** for what's deliberately out of scope. See **Known gaps** for the
+handful of real bugs that verification caught and fixed along the way.
+
+**What "works" actually looks like:**
+
+```
+TransferAsset("asset5", "Michel", "100") response:
+{"from":"Adriana","to":"Michel","value":"100","debitId":"<txID>-debit","creditId":"<txID>-credit"}
+```
+
+The ledger goes from 6 entries after `InitLedger` to 8 after the transfer -
+a `+100` credit for Michel, a `-100` debit for Adriana - asserted verbatim
+on every push in
+[live-network.yml](.github/workflows/live-network.yml#L88-L93), not just
+claimed here.
 
 The code exactly as submitted for the thesis is preserved at the
 [`v1.0.0` release](https://github.com/oniforo/central-bank-settlement-chain/releases/tag/v1.0.0).
@@ -54,7 +73,7 @@ that DLT settlement can match current RTGS speed.
 
 To test the idea at a small scale, the thesis builds a proof of concept
 using **Hyperledger Fabric** that models a simplified two-organization STR
-channel and demonstrates a fund transfer between two economic agents.This
+channel and demonstrates a fund transfer between two economic agents. This
 codebase is the practical artifact described in section 3.6 ("Proposta de
 Implementação").
 
@@ -241,8 +260,10 @@ existing balance in place.
 ## Known gaps
 
 The following describes the thesis submission's code ipsis literis; every
-item below has since been fixed. Kept as a record of what was actually
-wrong (the original analysis undersold it - see the first bullet).
+item below has since been fixed, and is kept as a record of what was
+actually wrong. The first bullet turned out to be worse than it first
+looked: the thesis's code didn't just return the wrong value, it called
+methods that didn't exist and could never have run at all.
 
 <details>
 <summary><strong>7 bugs found and fixed since the thesis submission (click to expand)</strong></summary>
