@@ -11,6 +11,17 @@ Decentralized Infrastructure by the Central Bank"), by Gabriel
 Orofino, Centro Universitário Ibmec/RJ, 2022 (advisor: Prof. Me. Victor
 Machado da Silva).
 
+**The proof of concept works.** The thesis's central goal was to attest the
+viability of this approach ("atestar a viabilidade"), and that's now been
+verified for real, not just written up: the two-organization Fabric channel
+described in section 3.6 has been deployed to a live Hyperledger Fabric
+network and run end to end - `InitLedger` seeding the ledger, `TransferAsset`
+moving value between two economic agents, `GetAllAssets` reflecting the
+result - through all three ways this repo can be used (the native `peer`
+CLI, the `fabric-network` SDK client, and the containerized client). See
+**Known gaps** for the handful of real bugs that verification caught and
+fixed along the way.
+
 The code exactly as submitted for the thesis is preserved at the
 [`v1.0.0` release](https://github.com/oniforo/central-bank-settlement-chain/releases/tag/v1.0.0).
 This document and the code have since been updated beyond that snapshot -
