@@ -87,7 +87,18 @@ Steps to get a working setup from here:
    present on a fresh Debian image, and its absence fails
    `createChannel.sh`'s anchor-peer-setting step with an unhelpful "Failed
    to parse channel configuration" error rather than a clear
-   "jq: command not found."
+   "jq: command not found." This isn't just cosmetic: if `createChannel.sh`
+   exits before reaching that step (for this reason or any other - we also
+   hit it by re-running the script after peers had already joined, which
+   exits early on "ledger already exists"), the channel's anchor peers
+   never get set. The native `peer` CLI still works fine without them, but
+   `server.js` (the SDK client, which uses discovery to find endorsing
+   peers) will fail with `DiscoveryService: ... failed constructing
+   descriptor for chaincodes`. If you hit that error, check whether anchor
+   peers actually got set - re-run just that part directly if needed:
+   `cd test-network && . scripts/envVar.sh && . scripts/setAnchorPeer.sh 1
+   canal-str && . scripts/setAnchorPeer.sh 2 canal-str` (needs `PATH`/
+   `FABRIC_CFG_PATH` exported first, same as `entrypoint.sh` sets them).
 3. **Run `install-fabric.sh` fresh inside the distro**, not by reusing the
    Windows-side install. The binaries are platform-specific
    (`hyperledger-fabric-windows-amd64-*.tar.gz` vs. `-linux-amd64-*`), so
@@ -125,6 +136,20 @@ does — setting it on the peer container (confirmed present via
 **Fix**: update Docker Desktop to a current version. There is no viable
 workaround short of that. This is a hard version floor, not a
 configuration issue.
+
+## After Docker Desktop was updated: two more (non-Windows-specific) bugs
+
+Once the Docker Engine version was no longer the blocker, deploying for
+real surfaced two actual code bugs in this repo - not Windows issues, they'd
+happen identically on Linux, just never got caught until something actually
+tried to run the chaincode/client live. Covered in the main
+[README's "Known gaps"](../README.md#known-gaps) section rather than
+repeated here: `chaincode/package.json` was missing the `fabric-shim`
+dependency and `"start"` script the chaincode container needs to actually
+launch, and `server.js` assumed a Fabric CA that `entrypoint.sh` never
+starts. Both are fixed now, but it's worth calling out that neither the
+unit test suite (which mocks `ctx.stub` and never runs a real chaincode
+container) nor static review caught either one - only an actual deploy did.
 
 ## Summary checklist for next time
 

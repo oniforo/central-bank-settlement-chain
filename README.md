@@ -119,8 +119,20 @@ yarn start
 
 `server.js` looks for the test-network's connection profile under
 `TEST_NETWORK_HOME` (defaults to `~/src/fabric/fabric-samples/test-network`,
-the same path `entrypoint.sh` uses) and enrolls an application identity into
-a local filesystem wallet (`wallet/`, gitignored) on first run.
+the same path `entrypoint.sh` uses) and, on first run, imports the
+`Admin@org1.example.com` identity from `entrypoint.sh`'s own cryptogen-
+generated MSP material into a local filesystem wallet (`wallet/`,
+gitignored) - the same identity the native `peer` CLI commands already use
+via `CORE_PEER_MSPCONFIGPATH`. `entrypoint.sh` brings the network up without
+`-ca`, so there's no running Fabric CA server to enroll against.
+
+Note: for the SDK's discovery service to find endorsing peers across both
+orgs (used by `gateway.connect`'s `discovery: { enabled: true }`), the
+channel's anchor peers must be set for both orgs - this happens at the end
+of `createChannel.sh`'s flow, so if that script exits early for any reason
+(see [docs/windows-wsl2-fabric-notes.md](docs/windows-wsl2-fabric-notes.md)
+for one way it can), `server.js` will fail with a discovery error even
+though the native `peer` CLI still works fine against the same network.
 
 **Containerized:**
 
@@ -185,6 +197,18 @@ since been fixed and are kept here as a record of what was actually wrong
   `server.js` now exists (see **What's in this repo**).
 - ~~`Dockerfile`/`docker-compose.yml` were empty~~ - now containerize the
   client app (see **Running the client app**).
+- ~~`chaincode/package.json` had no `"start"` script or `fabric-shim`
+  dependency~~ - discovered by actually deploying it: the chaincode
+  container built and installed fine, then crashed immediately
+  (`npm error Missing script: "start"`). `fabric-contract-api` alone only
+  provides the contract framework; `fabric-shim` (via its
+  `fabric-chaincode-node` CLI) is the runtime that actually starts the
+  chaincode server. Fixed by adding both.
+- ~~`server.js` assumed a Fabric CA-based enrollment flow~~ - discovered the
+  same way: it failed trying to reach a CA that was never started, since
+  `entrypoint.sh` brings the network up without `-ca`. Fixed by importing
+  the existing cryptogen-generated `Admin@org1.example.com` identity
+  directly instead (see **Running the client app**).
 - ~~`entrypoint.sh` deployed chaincode from
   `../asset-transfer-basic/chaincode-javascript`~~ - a path inside
   `fabric-samples`, not from this repo, so `functions.js` was never actually
