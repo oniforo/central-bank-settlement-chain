@@ -1,0 +1,120 @@
+name: live-network
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  live-network-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Install Hyperledger Fabric (binaries, samples, Docker images)
+        run: |
+          mkdir -p "$HOME/src/fabric"
+          cd "$HOME/src/fabric"
+          curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
+          chmod +x install-fabric.sh
+          ./install-fabric.sh
+
+      - name: Bring up test network, create channel, deploy this repo's chaincode
+        run: |
+          cd "$HOME/src/fabric/fabric-samples/test-network"
+          ./network.sh up
+          ./network.sh createChannel -c canal-str
+          ./network.sh deployCC -c canal-str -ccn basico -ccp "$GITHUB_WORKSPACE/chaincode" -ccl javascript
+
+      - name: Invoke/query via native peer CLI and assert the results
+        run: |
+          set -e
+          cd "$HOME/src/fabric/fabric-samples/test-network"
+          export PATH="${PWD}/../bin:${PATH}"
+          export FABRIC_CFG_PATH="${PWD}/../config/"
+          export CORE_PEER_TLS_ENABLED=true
+          export CORE_PEER_LOCALMSPID="Org1MSP"
+          export CORE_PEER_TLS_ROOTCERT_FILE="${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+          export CORE_PEER_MSPCONFIGPATH="${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp"
+          export CORE_PEER_ADDRESS=localhost:7051
+          CAFILE="${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem"
+          ORG1_TLS="${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+          ORG2_TLS="${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+
+          peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls \
+            --cafile "$CAFILE" -C canal-str -n basico \
+            --peerAddresses localhost:7051 --tlsRootCertFiles "$ORG1_TLS" \
+            --peerAddresses localhost:9051 --tlsRootCertFiles "$ORG2_TLS" \
+            -c '{"function":"InitLedger","Args":[]}'
+          sleep 3
+
+          assets=$(peer chaincode query -C canal-str -n basico -c '{"Args":["GetAllAssets"]}')
+          echo "GetAllAssets after InitLedger: $assets"
+          count=$(echo "$assets" | jq 'length')
+          if [ "$count" -ne 6 ]; then
+            echo "FAIL: expected 6 assets after InitLedger, got $count"
+            exit 1
+          fi
+
+          transfer_output=$(peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls \
+            --cafile "$CAFILE" -C canal-str -n basico \
+            --peerAddresses localhost:7051 --tlsRootCertFiles "$ORG1_TLS" \
+            --peerAddresses localhost:9051 --tlsRootCertFiles "$ORG2_TLS" \
+            -c '{"function":"TransferAsset","Args":["asset5","Michel","100"]}' 2>&1)
+          echo "$transfer_output"
+          # peer chaincode invoke logs the payload as an escaped string inside
+          # its own structured log line (\"from\":\"Adriana\"...), unlike the
+          # SDK client which prints clean unescaped JSON - match that form here.
+          echo "$transfer_output" | grep -q '\\"from\\":\\"Adriana\\",\\"to\\":\\"Michel\\",\\"value\\":\\"100\\"' \
+            || { echo "FAIL: TransferAsset response did not match the expected shape"; exit 1; }
+          sleep 3
+
+          assets2=$(peer chaincode query -C canal-str -n basico -c '{"Args":["GetAllAssets"]}')
+          echo "GetAllAssets after TransferAsset: $assets2"
+          count2=$(echo "$assets2" | jq 'length')
+          if [ "$count2" -ne 8 ]; then
+            echo "FAIL: expected 8 entries after TransferAsset, got $count2"
+            exit 1
+          fi
+          credit=$(echo "$assets2" | jq -r '[.[] | select(.Owner=="Michel" and (.ID | endswith("-credit")))][0].AppraisedValue')
+          debit=$(echo "$assets2" | jq -r '[.[] | select(.Owner=="Adriana" and (.ID | endswith("-debit")))][0].AppraisedValue')
+          if [ "$credit" != "100" ] || [ "$debit" != "-100" ]; then
+            echo "FAIL: unexpected debit/credit values (credit=$credit debit=$debit)"
+            exit 1
+          fi
+          echo "Native peer CLI verification passed."
+
+      - name: Install client dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run the SDK client (bare host) and assert its output
+        run: |
+          set -e
+          output=$(TEST_NETWORK_HOME="$HOME/src/fabric/fabric-samples/test-network" node server.js 2>&1)
+          echo "$output"
+          echo "$output" | grep -q '"from":"Adriana","to":"Michel","value":"100"' \
+            || { echo "FAIL: server.js (bare host) output did not match the expected shape"; exit 1; }
+
+      - name: Run the containerized client and assert its output
+        run: |
+          set -e
+          rm -rf wallet
+          export TEST_NETWORK_HOME="$HOME/src/fabric/fabric-samples/test-network"
+          docker compose up --build --exit-code-from app | tee compose-output.log
+          grep -q '"from":"Adriana","to":"Michel","value":"100"' compose-output.log \
+            || { echo "FAIL: containerized client output did not match the expected shape"; exit 1; }
+
+      - name: Tear down the test network
+        if: always()
+        run: |
+          cd "$HOME/src/fabric/fabric-samples/test-network"
+          ./network.sh down || true
