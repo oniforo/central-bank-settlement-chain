@@ -1,15 +1,15 @@
-# Fund Transfer System - Decentralized Infrastructure PoC
+# Central Bank Settlement Chain
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/oniforo/central-bank-settlement-chain/test.yml?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/actions/workflows/test.yml)
+[![Unit Tests](https://img.shields.io/github/actions/workflow/status/oniforo/central-bank-settlement-chain/test.yml?label=tests&style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/actions/workflows/test.yml)
+[![Live Network Verification](https://img.shields.io/github/actions/workflow/status/oniforo/central-bank-settlement-chain/live-network.yml?label=live-network&style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/actions/workflows/live-network.yml)
 [![Latest Release](https://img.shields.io/github/v/release/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/releases/latest)
 [![License](https://img.shields.io/github/license/oniforo/central-bank-settlement-chain?style=flat-square)](https://github.com/oniforo/central-bank-settlement-chain/blob/main/LICENSE)
 
-This repository holds the proof-of-concept code from the bachelor's thesis
-**"Sistema de Transferência de Fundos: Adoção de uma Infraestrutura
-Descentralizada pelo Banco Central"** ("Fund Transfer System: Adoption of a
-Decentralized Infrastructure by the Central Bank"), by Gabriel
-Orofino, Centro Universitário Ibmec/RJ, 2022 (advisor: Prof. Me. Victor
-Machado da Silva).
+> **Sistema de Transferência de Fundos: Adoção de uma Infraestrutura
+> Descentralizada pelo Banco Central** ("Fund Transfer System: Adoption of a
+> Decentralized Infrastructure by the Central Bank") - bachelor's thesis by
+> Gabriel Orofino, Centro Universitário Ibmec/RJ, 2022 (advisor: Prof. Me.
+> Victor Machado da Silva). This repository holds its proof-of-concept code.
 
 **The proof of concept works.** The thesis's central goal was to attest the
 viability of this approach ("atestar a viabilidade"), and that's now been
@@ -26,6 +26,19 @@ The code exactly as submitted for the thesis is preserved at the
 [`v1.0.0` release](https://github.com/oniforo/central-bank-settlement-chain/releases/tag/v1.0.0).
 This document and the code have since been updated beyond that snapshot -
 see **Known gaps** for what's changed and why.
+
+## Contents
+
+- [Context](#context)
+- [What's in this repo](#whats-in-this-repo)
+- [Architecture](#architecture)
+- [Running the PoC](#running-the-poc)
+- [Running the client app](#running-the-client-app)
+- [Running tests](#running-tests)
+- [Simplifying hypothesis](#simplifying-hypothesis-from-the-thesis)
+- [Known gaps](#known-gaps)
+- [Future work](#future-work-from-the-thesiss-closing-remarks)
+- [Reference](#reference)
 
 ## Context
 
@@ -64,10 +77,12 @@ Implementação").
     actually builds from (`peer lifecycle chaincode package` needs the
     chaincode directory to be a standalone Node package - see **Known gaps**
     for why this lives in its own subdirectory rather than at the repo root)
-- [server.js](server.js) - a `fabric-network`/`fabric-ca-client` CLI client
-  that enrolls an application identity, connects to the `canal-str` channel,
-  and runs a demo sequence against the `basico` chaincode (`InitLedger`,
-  `GetAllAssets`, a `TransferAsset` call, `GetAllAssets` again)
+- [server.js](server.js) - a `fabric-network` SDK client that imports the
+  existing `Admin@org1.example.com` identity (from `entrypoint.sh`'s static
+  cryptogen-generated MSP material) into a local wallet, connects to the
+  `canal-str` channel, and runs a demo sequence against the `basico`
+  chaincode (`InitLedger`, `GetAllAssets`, a `TransferAsset` call,
+  `GetAllAssets` again)
 - [entrypoint.sh](entrypoint.sh) - the exact command sequence from section
   3.6: installs Hyperledger Fabric, brings up the `test-network` sample,
   creates the `canal-str` channel, deploys chaincode from `chaincode/` (this
@@ -78,8 +93,8 @@ Implementação").
   Docker network so it can reach the running peers (see **Running the
   client app**)
 - [package.json](package.json) / [yarn.lock](yarn.lock) - Node manifest for
-  the client (`fabric-network`, `fabric-ca-client`) and test tooling
-  (Mocha/Chai/Sinon/nyc). Also declares the chaincode's runtime dependencies
+  the client (`fabric-network`) and test tooling (Mocha/Chai/Sinon/nyc).
+  Also declares the chaincode's runtime dependencies
   (`fabric-contract-api`, `json-stringify-deterministic`,
   `sort-keys-recursive`) so `require('../chaincode/functions.js')` resolves
   locally for tests via Node's upward `node_modules` lookup - the actual
@@ -90,10 +105,43 @@ Implementação").
   tests for `chaincode/functions.js`, run automatically on every push/PR
   (see [.github/workflows/test.yml](.github/workflows/test.yml))
 
+## Architecture
+
+Two organizations, one channel, one chaincode - `entrypoint.sh` stands this
+up from Fabric's `test-network` sample, and all three client paths below
+talk to the same running network:
+
+```mermaid
+flowchart LR
+    subgraph channel [canal-str channel]
+        direction TB
+        P1["peer0.org1<br/>chaincode: basico"]
+        P2["peer0.org2<br/>chaincode: basico"]
+    end
+    O(("orderer<br/>Raft"))
+
+    CLI["peer CLI<br/>(entrypoint.sh)"]
+    SDK["server.js<br/>(fabric-network SDK)"]
+    APP["docker compose<br/>(containerized client)"]
+
+    CLI -->|invoke / query| P1
+    CLI -->|invoke / query| P2
+    SDK -->|Gateway.connect| P1
+    SDK -->|Gateway.connect| P2
+    APP -.->|same as SDK, over the<br/>fabric_test Docker network| P1
+    P1 <--> O
+    P2 <--> O
+```
+
+`basico` is the chaincode ID `entrypoint.sh` deploys `chaincode/` under -
+see **What's in this repo** above for what each piece actually does, and
+**Running the PoC**/**Running the client app** below for how to drive each
+of the three paths.
+
 ## Running the PoC
 
-Prerequisites: Docker, `curl`, and a Linux-like shell (the thesis used
-Ubuntu 20.04 LTS on a Linode instance).
+Prerequisites: Docker, `curl`, Node.js 20 + Yarn, and a Linux-like shell
+(the thesis used Ubuntu 20.04 LTS on a Linode instance).
 
 ```bash
 yarn install
@@ -177,7 +225,9 @@ brings up a real test network, deploys this repo's chaincode, and asserts
 on the actual `InitLedger`/`TransferAsset`/`GetAllAssets` output through
 all three paths (native `peer` CLI, the SDK client, and the containerized
 client) - the same verification described in **Context** above, now
-re-run automatically instead of only having been done once by hand.
+re-run automatically instead of only having been done once by hand. Both
+workflows are required status checks on `main` - neither can be merged
+past while red.
 
 ## Simplifying hypothesis (from the thesis)
 
@@ -190,9 +240,12 @@ existing balance in place.
 
 ## Known gaps
 
-The following described the thesis submission's code ipsis literis; they've
-since been fixed and are kept here as a record of what was actually wrong
-(the original analysis undersold it - see the first bullet):
+The following describes the thesis submission's code ipsis literis; every
+item below has since been fixed. Kept as a record of what was actually
+wrong (the original analysis undersold it - see the first bullet).
+
+<details>
+<summary><strong>7 bugs found and fixed since the thesis submission (click to expand)</strong></summary>
 
 - ~~`TransferAsset` returns an undefined variable~~ **and, more seriously,
   called two methods that didn't exist.** `CreateAsset` called
@@ -224,7 +277,8 @@ since been fixed and are kept here as a record of what was actually wrong
   same way: it failed trying to reach a CA that was never started, since
   `entrypoint.sh` brings the network up without `-ca`. Fixed by importing
   the existing cryptogen-generated `Admin@org1.example.com` identity
-  directly instead (see **Running the client app**).
+  directly instead, which also let `fabric-ca-client` be dropped from
+  `package.json` entirely (see **Running the client app**).
 - ~~The containerized client couldn't reach the peers~~ - `AS_LOCALHOST=false`
   only affects addresses the *discovery service* returns; the connection
   profile's own peer/CA `url` fields are hardcoded to `localhost` (generated
@@ -242,6 +296,8 @@ since been fixed and are kept here as a record of what was actually wrong
   sees the directory passed via `-ccp`, nothing outside it) and pointing
   `entrypoint.sh`'s `deployCC` at that directory via an absolute path
   computed from the script's own location.
+
+</details>
 
 **Known, accepted security risk**: `jsrsasign` (used by `fabric-common` for
 certificate/crypto handling) has several open CVEs, including one critical.
