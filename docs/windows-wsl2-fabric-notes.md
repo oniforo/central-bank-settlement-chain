@@ -137,19 +137,24 @@ does — setting it on the peer container (confirmed present via
 workaround short of that. This is a hard version floor, not a
 configuration issue.
 
-## After Docker Desktop was updated: two more (non-Windows-specific) bugs
+## After Docker Desktop was updated: three more (non-Windows-specific) bugs
 
-Once the Docker Engine version was no longer the blocker, deploying for
-real surfaced two actual code bugs in this repo - not Windows issues, they'd
-happen identically on Linux, just never got caught until something actually
-tried to run the chaincode/client live. Covered in the main
+Once the Docker Engine version was no longer the blocker, actually running
+each of the three paths (native `peer` CLI, SDK client bare-host, SDK
+client containerized) surfaced three real code bugs in this repo - not
+Windows issues, they'd happen identically on Linux, just never got caught
+until something actually tried to run them live. Covered in the main
 [README's "Known gaps"](../README.md#known-gaps) section rather than
 repeated here: `chaincode/package.json` was missing the `fabric-shim`
 dependency and `"start"` script the chaincode container needs to actually
-launch, and `server.js` assumed a Fabric CA that `entrypoint.sh` never
-starts. Both are fixed now, but it's worth calling out that neither the
-unit test suite (which mocks `ctx.stub` and never runs a real chaincode
-container) nor static review caught either one - only an actual deploy did.
+launch; `server.js` assumed a Fabric CA that `entrypoint.sh` never starts;
+and the containerized client couldn't reach the peers because the
+connection profile's `localhost` URLs are used as-is for the initial
+bootstrap connection, unaffected by `AS_LOCALHOST`/`discovery.asLocalhost`.
+All three are fixed now, but it's worth calling out that neither the unit
+test suite (which mocks `ctx.stub` and never runs a real chaincode
+container or network connection) nor static review caught any of them -
+only an actual deploy did, one path at a time.
 
 ## Summary checklist for next time
 

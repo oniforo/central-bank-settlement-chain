@@ -209,6 +209,13 @@ since been fixed and are kept here as a record of what was actually wrong
   `entrypoint.sh` brings the network up without `-ca`. Fixed by importing
   the existing cryptogen-generated `Admin@org1.example.com` identity
   directly instead (see **Running the client app**).
+- ~~The containerized client couldn't reach the peers~~ - `AS_LOCALHOST=false`
+  only affects addresses the *discovery service* returns; the connection
+  profile's own peer/CA `url` fields are hardcoded to `localhost` (generated
+  for host-based clients) and are used as-is for the initial bootstrap
+  connection. From inside a container that's not reachable. Fixed by
+  rewriting those URLs to each entry's real hostname
+  (`grpcOptions['ssl-target-name-override']`) when not running as localhost.
 - ~~`entrypoint.sh` deployed chaincode from
   `../asset-transfer-basic/chaincode-javascript`~~ - a path inside
   `fabric-samples`, not from this repo, so `functions.js` was never actually
