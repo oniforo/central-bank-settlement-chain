@@ -169,10 +169,15 @@ yarn test
 ```
 
 This runs Mocha under `nyc` for coverage reporting. `server.js` isn't
-covered by these tests - it's a thin SDK wrapper whose behavior only means
-anything against a live network, so it's exercised via **Running the client
-app** instead. The same `yarn test` command runs on every push/PR via
-[GitHub Actions](.github/workflows/test.yml).
+covered by these unit tests - it's a thin SDK wrapper whose behavior only
+means anything against a live network. It's covered instead by a separate
+CI workflow, [.github/workflows/live-network.yml](.github/workflows/live-network.yml),
+which runs on every push/PR alongside the unit tests: installs Fabric,
+brings up a real test network, deploys this repo's chaincode, and asserts
+on the actual `InitLedger`/`TransferAsset`/`GetAllAssets` output through
+all three paths (native `peer` CLI, the SDK client, and the containerized
+client) - the same verification described in **Context** above, now
+re-run automatically instead of only having been done once by hand.
 
 ## Simplifying hypothesis (from the thesis)
 
