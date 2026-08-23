@@ -9,7 +9,6 @@
     "test": "nyc mocha --recursive"
   },
   "dependencies": {
-    "fabric-ca-client": "^2.2.20",
     "fabric-contract-api": "^2.5.8",
     "fabric-network": "^2.2.20",
     "json-stringify-deterministic": "^1.0.16",

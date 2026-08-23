@@ -5,6 +5,6 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production
 
-COPY functions.js server.js ./
+COPY server.js ./
 
 CMD ["node", "server.js"]
