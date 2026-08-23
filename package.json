@@ -1,6 +1,6 @@
 {
   "name": "central-bank-settlement-chain",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "server.js",
   "author": "Gabriel Orofino",
   "license": "Apache-2.0",
