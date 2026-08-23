@@ -26,11 +26,37 @@ const adminMspPath = path.join(
 const walletPath = path.join(__dirname, 'wallet');
 const asLocalhost = process.env.AS_LOCALHOST !== 'false';
 
+// The test-network's connection profile always hardcodes `localhost` in
+// each peer/CA's `url`, since it's generated for host-based SDK clients.
+// `discovery.asLocalhost` only translates addresses the discovery service
+// returns *after* the initial connection - it doesn't touch this bootstrap
+// URL. So when running inside a container on the `fabric_test` network
+// (AS_LOCALHOST=false), rewrite `localhost` to each entry's real hostname
+// (`grpcOptions['ssl-target-name-override']` for peers, or the entry's own
+// key for CAs) so the initial connection resolves via Docker's DNS instead.
+function rewriteHostsForContainer(ccp) {
+    if (asLocalhost) {
+        return ccp;
+    }
+    for (const section of ['peers', 'orderers', 'certificateAuthorities']) {
+        const entries = ccp[section];
+        if (!entries) {
+            continue;
+        }
+        for (const [name, entry] of Object.entries(entries)) {
+            const hostname = (entry.grpcOptions && entry.grpcOptions['ssl-target-name-override']) || name;
+            entry.url = entry.url.replace('localhost', hostname);
+        }
+    }
+    return ccp;
+}
+
 function buildCCP() {
     if (!fs.existsSync(ccpPath)) {
         throw new Error(`Connection profile not found at ${ccpPath}. Set TEST_NETWORK_HOME or bring up the test network via entrypoint.sh first.`);
     }
-    return JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
+    const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
+    return rewriteHostsForContainer(ccp);
 }
 
 function readSingleFile(dir) {
