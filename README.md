@@ -95,6 +95,15 @@ binaries and Docker images, stands up `test-network`, creates the
 CLI. It is a reference/runbook script (as in the thesis), not meant to be
 executed unattended.
 
+**On Windows**, don't run this in Git Bash - Fabric's native Windows
+binaries and its Docker-heavy scripts need conflicting path-translation
+behavior from Git Bash/MSYS, in ways that fail unpredictably partway
+through. Use WSL2 with a real Linux distro instead; see
+[docs/windows-wsl2-fabric-notes.md](docs/windows-wsl2-fabric-notes.md) for
+what was actually hit trying this (including a WSL2 distro that wouldn't
+start at all, and a Docker Engine version floor) and how to get a working
+setup.
+
 ## Running the client app
 
 Once the test network is up and chaincode `basico` is deployed (i.e. after
